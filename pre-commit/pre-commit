@@ -7,7 +7,6 @@
 #
 # see the README
 
-FILE_PATTERN="\.(php|phtml)$"
 TMP_STAGING=".tmp_staging"
 
 hookfile="`readlink -f "$0"`"
@@ -33,9 +32,23 @@ fi
 # match files against whitelist
 FILES_TO_CHECK=""
 for FILE in $FILES; do
-    echo "$FILE" | egrep -q "$FILE_PATTERN"
-    RETVAL=$?
-    if [ "$RETVAL" -eq "0" ]; then
+    EXT=${FILE##*.}
+
+    CHECK=1
+    case $EXT in
+        "php" | "phtml" )
+            PHP_FILES="$PHP_FILES $FILE"
+            LINE_FILES="$LINE_FILES $FILE"
+            ;;
+        css | htm | html | js | rst | tpl | txt | ts | tss | tsc )
+            LINE_FILES="$LINE_FILES $FILE"
+            ;;
+        * )
+            CHECK=0
+            ;;
+    esac
+
+    if [ "$CHECK" -eq "1" ]; then
         FILES_TO_CHECK="$FILES_TO_CHECK $FILE"
     fi
 done
@@ -66,13 +79,17 @@ for FILE in $FILES_TO_CHECK; do
     STAGED_FILE="$TMP_STAGING/$FILE"
     git cat-file blob $ID > "$STAGED_FILE"
     STAGED_FILES="$STAGED_FILES $STAGED_FILE"
+done
 
+for FILE in $PHP_FILES; do
     "$HOOKHOME/pre-commit-check-php" "$STAGED_FILE"; RET=$?
     if [ $RET -ne 0 ]; then
         HAS_ERROR=1
         continue
     fi
+done
 
+for FILE in $LINE_FILES; do
     "$HOOKHOME/pre-commit-check-linestyle" "$STAGED_FILE"; RET=$?
     if [ $RET -ne 0 ]; then
         HAS_ERROR=1
